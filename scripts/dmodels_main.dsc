@@ -140,4 +140,4 @@ dmodels_config:
     # You can optionally set the json indent for the resource pack to save space (0 for example).
     resource_pack_indent: 4
     # Set the resource pack version https://minecraft.fandom.com/wiki/Pack_format
-    resource_pack_version: 61
+    resource_pack_version: 46
