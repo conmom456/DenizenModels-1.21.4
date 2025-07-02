@@ -58,11 +58,11 @@ dmodels_move_to_frame:
             - case hold:
                 - define timespot <[animation_data.length]>
                 - flag server dmodels_anim_active.<[root_entity].uuid>:!
-    - define global_rotation <[root_entity].flag[dmodel_global_rotation]>
     - define global_scale <[root_entity].flag[dmodel_global_scale].mul[<script[dmodels_config].parsed_key[default_scale]>]>
-    - define center <[root_entity].location.with_pitch[0].below[1]>
-    - define yaw_quaternion <location[0,1,0].to_axis_angle_quaternion[<[root_entity].flag[dmodel_yaw].add[180].to_radians.mul[-1]>]>
-    - define orientation <[yaw_quaternion].mul[<[global_rotation]>]>
+    - define center <[root_entity].location.with_pitch[0]>
+    - define rotation <[root_entity].flag[dmodel_global_rotation]>
+    - define rotation_fix <location[0,1,0].to_axis_angle_quaternion[<util.pi>]>
+    - define orientation <[rotation_fix].mul[<[rotation]>]>
     - define parentage <map>
     - foreach <[animation_data.animators]> key:part_id as:animator:
         - define framedata.position <location[0,0,0]>
@@ -233,7 +233,7 @@ dmodels_animator_world:
         - foreach <server.flag[dmodels_attached]> as:root:
             - if <[root].is_spawned||false> && <[root].flag[dmodels_attached_to].is_spawned||false>:
                 - define target <[root].flag[dmodels_attached_to]>
-                - teleport <[root]> <[target].location>
+                - teleport <[root]> <[target].location.above[1]>
                 - if <[root].flag[dmodels_attach_auto_animate]> && !<[root].flag[dmodels_temp_alt_anim].is_truthy||false>:
                     - define preferred idle
                     - if <[target].is_sneaking||false>:

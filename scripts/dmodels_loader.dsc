@@ -42,13 +42,13 @@ dmodels_load_bbmodel:
     # =============== Prep ===============
     - define model_name_lowercased <[model_name].to_lowercase>
     - define pack_root <script[dmodels_config].parsed_key[resource_pack_path]>
-    - define models_root <[pack_root]>/assets/minecraft/models/item/dmodels/<[model_name_lowercased]>
-    - define textures_root <[pack_root]>/assets/minecraft/textures/dmodels/<[model_name_lowercased]>
+    - define items_root <[pack_root]>/assets/dmodels/items/<[model_name_lowercased]>
+    - define models_root <[pack_root]>/assets/dmodels/models/<[model_name_lowercased]>
+    - define textures_root <[pack_root]>/assets/dmodels/textures/item/<[model_name_lowercased]>
     - define item_validate <item[<script[dmodels_config].parsed_key[item]>]||null>
     - if <[item_validate]> == null:
       - debug error "[DModels] Item must be valid Example: potion"
       - stop
-    - define override_item_filepath <[pack_root]>/assets/minecraft/models/item/<script[dmodels_config].parsed_key[item]>.json
     - define file data/dmodels/<[model_name]>.bbmodel
     - define scale_factor <element[0.25].div[4.0]>
     - define mc_texture_data <map>
@@ -100,10 +100,10 @@ dmodels_load_bbmodel:
                 - run dmodels_multiwaitable_filewrite def.key:<[model_name]> def.path:<[texture_meta_path]> def.data:<[meta_data].to_json[native_types=true;indent=<[pack_indent]>].utf8_encode>
         - define texture_output_path <[textures_root]>/<[texname]>.png
         - run dmodels_multiwaitable_filewrite def.key:<[model_name]> def.path:<[texture_output_path]> def.data:<[raw_source].after[,].base64_to_binary>
-        - define proper_path dmodels/<[model_name_lowercased]>/<[texname]>
+        - define proper_path dmodels:item/<[model_name_lowercased]>/<[texname]>
         - define mc_texture_data.<[tex_id]> <[proper_path]>
         - define texture_paths:->:<[proper_path]>
-        - if <[texture.particle]||false>:
+        - if <[texture.particle]||false> or <[loop_index]> == 1:
             - define mc_texture_data.particle <[proper_path]>
         - define tex_id:++
     # =============== Elements loading ===============
@@ -123,7 +123,7 @@ dmodels_load_bbmodel:
     # =============== Outlines loading ===============
     - define root_outline null
     - foreach <[data.outliner]||<list>> as:outliner:
-        - define outliner.name <[outliner.name].to_lowercase>
+        # - define outliner.name <[outliner.name].to_lowercase>
         - if <[outliner].matches_character_set[abcdef0123456789-]>:
             - if <[root_outline]> == null:
                 - definemap root_outline name:__root__ origin:0,0,0 rotation:0,0,0 uuid:genroot_<util.random_uuid> parent:none
@@ -166,51 +166,18 @@ dmodels_load_bbmodel:
                             - define anim_map.right_value <[keyframe.bezier_right_value].parse[trim].comma_separated>
                     - define data_points <[keyframe.data_points].first>
                     - if <[keyframe.channel]> == rotation:
-                        - define anim_map.data <proc[dmodels_quaternion_from_euler].context[<[data_points.x].trim.to_radians.mul[-1]>|<[data_points.y].trim.to_radians.mul[-1]>|<[data_points.z].trim.to_radians>].normalize>
+                        - define data_x <[data_points.x].trim.to_radians.mul[-1]||0>
+                        - define data_y <[data_points.y].trim.to_radians.mul[-1]||0>
+                        - define data_z <[data_points.z].trim.to_radians||0>
+                        - define anim_map.data <proc[dmodels_quaternion_from_euler].context[<[data_x]>|<[data_y]>|<[data_z]>].normalize>
                     - else:
-                        - define anim_map.data <[data_points.x].trim>,<[data_points.y].trim>,<[data_points.z].trim>
+                        - define anim_map.data <[data_points.x].trim||0>,<[data_points.y].trim||0>,<[data_points.z].trim||0>
                     - define animation_list.<[animation.name]>.animators.<[o_uuid]>.frames:->:<[anim_map]>
                 # Sort frames by time (why is this not done by default? BlockBench is weird)
                 - define animation_list.<[animation.name]>.animators.<[o_uuid]>.frames <[animation_list.<[animation.name]>.animators.<[o_uuid]>.frames].sort_by_value[get[time]]>
     - if <[animation_list].any||false>:
         - flag server dmodels_data.animations_<[model_name]>:<[animation_list]>
-    # =============== Atlas gen ===============
-    - define atlas_file <[pack_root]>/assets/minecraft/atlases/blocks.json
-    - waituntil rate:1t max:15s !<server.has_flag[dmodels_temp_atlas_handling]>
-    - if <server.has_flag[dmodels_temp_atlas_file]>:
-        - define atlas_data <util.parse_yaml[<server.flag[dmodels_temp_atlas_file].utf8_decode>]>
-    - else if <util.has_file[<[atlas_file]>]>:
-        - flag server dmodels_temp_atlas_handling expire:1h
-        - ~fileread path:<[atlas_file]> save:atlas_file_data
-        - flag server dmodels_temp_atlas_handling:!
-        - define atlas_data <util.parse_yaml[<entry[atlas_file_data].data.utf8_decode>]>
-    - else:
-        - definemap atlas_data sources:<list>
-    - define known_atlas_dirs <[atlas_data.sources].parse[get[source]].deduplicate>
-    - define atlas_dirs_to_track <[texture_paths].parse[before_last[/]].deduplicate>
-    - define atlas_dirs_to_add <[atlas_dirs_to_track].exclude[<[known_atlas_dirs]>]>
-    - if <[atlas_dirs_to_add].any>:
-        - foreach <[atlas_dirs_to_add]> as:new_dir:
-            - definemap src:
-                type: directory
-                source: <[new_dir]>
-                prefix: <[new_dir]>/
-            - define atlas_data.sources:->:<[src]>
-        - define new_atlas_json <[atlas_data].to_json[indent=<[pack_indent]>].utf8_encode>
-        - flag server dmodels_temp_atlas_file:<[new_atlas_json]> expire:1h
-        - waituntil rate:1t max:15s !<server.has_flag[dmodels_data.temp_core.filewrites.<[atlas_file].escaped>]>
-        - run dmodels_multiwaitable_filewrite def.key:core def.path:<[atlas_file]> def.data:<[new_atlas_json]>
     # =============== Item model file generation ===============
-    - waituntil rate:1t max:15s !<server.has_flag[dmodels_temp_item_reading]>
-    - if <server.has_flag[dmodels_temp_item_file]>:
-        - define override_item_data <util.parse_yaml[<server.flag[dmodels_temp_item_file].utf8_decode>]>
-    - else if <util.has_file[<[override_item_filepath]>]>:
-        - flag server dmodels_temp_item_reading expire:1h
-        - ~fileread path:<[override_item_filepath]> save:override_item
-        - flag server dmodels_temp_item_reading:!
-        - define override_item_data <util.parse_yaml[<entry[override_item].data.utf8_decode>]>
-    - else:
-        - definemap override_item_data parent:minecraft:item/generated textures:<map[layer0=minecraft:item/<script[dmodels_config].parsed_key[item]>]>
     # NOTE: THE BELOW SECTION MUST NOT WAIT! For item override file interlock.
     - define overrides_changed false
     - foreach <server.flag[dmodels_data.temp_<[model_name]>.raw_outlines]> as:outline:
@@ -244,30 +211,22 @@ dmodels_load_bbmodel:
             #### Item override building
             - definemap json_group name:<[outline.name].to_lowercase> color:0 children:<util.list_numbers[from=0;to=<[child_count]>]> origin:<[outline_origin].mul[<[scale_factor]>].xyz.split[,]>
             - define model_json.groups <list[<[json_group]>]>
-            - define model_json.display.head.translation <list[32|32|32]>
+            - define model_json.display.head.translation <list[-32|32|-32]>
             - define model_json.display.head.scale <list[4|4|4]>
+            - define model_json.display.head.rotation <list[0|180|0]>
             - define modelpath item/dmodels/<[model_name_lowercased]>/<[outline.name].to_lowercase>
             - run dmodels_multiwaitable_filewrite def.key:<[model_name]> def.path:<[models_root]>/<[outline.name].to_lowercase>.json def.data:<[model_json].to_json[native_types=true;indent=<[pack_indent]>].utf8_encode>
-            - define cmd 0
-            - define min_cmd 1000
-            - foreach <[override_item_data.overrides]||<list>> as:override:
-                - if <[override.model]> == <[modelpath]>:
-                    - define cmd <[override.predicate.custom_model_data]>
-                - define min_cmd <[min_cmd].max[<[override.predicate.custom_model_data].add[1]||1000>]>
-            - if <[cmd]> == 0:
-                - define cmd <[min_cmd]>
-                - define override_item_data.overrides:->:<map[predicate=<map[custom_model_data=<[cmd]>]>].with[model].as[<[modelpath]>]>
-                - define overrides_changed true
-            - define outline.item <script[dmodels_config].parsed_key[item]>[custom_model_data=<[cmd]>;color=white]
+            - define outline.item <script[dmodels_config].parsed_key[item]>[components_patch=<map[minecraft:item_model=string:dmodels:<[model_name_lowercased]>/<[outline.name].to_lowercase>]>;color=white]
         # This sets the actual live usage flag data
         - define rotation <[outline.rotation].split[,]>
         - define outline.rotation <proc[dmodels_quaternion_from_euler].context[<[rotation].parse[to_radians]>]>
         - flag server dmodels_data.model_<[model_name]>.<[outline.uuid]>:<[outline]>
-    - if <[overrides_changed]>:
-        - define override_file_json <[override_item_data].to_json[native_types=true;indent=<[pack_indent]>].utf8_encode>
-        - flag server dmodels_temp_item_file:<[override_file_json]> expire:1h
-        - waituntil rate:1t max:15s !<server.has_flag[dmodels_data.temp_core.filewrites.<[override_item_filepath].escaped>]>
-        - run dmodels_multiwaitable_filewrite def.key:<[model_name]> def.path:<[override_item_filepath]> def.data:<[override_file_json]>
+        - if <[modelpath].exists>:
+            - definemap item_model:
+                model:
+                    type: minecraft:model
+                    model: dmodels:<[model_name_lowercased]>/<[outline.name].to_lowercase>
+            - run dmodels_multiwaitable_filewrite def.key:<[model_name]> def.path:<[items_root]>/<[outline.name].to_lowercase>.json def.data:<[item_model].to_json[native_types=true;indent=<[pack_indent]>].utf8_encode>
     # Ensure all filewrites are done before ending the task
     - waituntil rate:1t max:5m <server.flag[dmodels_data.temp_<[model_name]>.filewrites].is_empty||true> && <server.flag[dmodels_data.temp_core.filewrites].is_empty||true>
     # Final clear of temp data
@@ -347,5 +306,11 @@ dmodels_quaternion_from_euler:
     - define x_q <location[1,0,0].to_axis_angle_quaternion[<[x]>]>
     - define y_q <location[0,1,0].to_axis_angle_quaternion[<[y]>]>
     - define z_q <location[0,0,1].to_axis_angle_quaternion[<[z]>]>
-    - determine <[x_q].mul[<[y_q]>].mul[<[z_q]>]>
+    - determine <[z_q].mul[<[y_q]>].mul[<[x_q]>]>
 
+dmodels_clear_cache:
+    type: task
+    debug: false
+    script:
+    - flag server dmodels_temp_atlas_file:!
+    - flag server dmodels_temp_item_file:!

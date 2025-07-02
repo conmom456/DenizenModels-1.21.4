@@ -8,6 +8,7 @@
 
 dmodels_npc_assignment:
     type: assignment
+    debug: false
     actions:
         on assignment:
         - if <npc.is_spawned>:
@@ -17,6 +18,8 @@ dmodels_npc_assignment:
         on spawn:
         - run dmodels_npc_spawn
         on despawn:
+        - run dmodels_npc_despawn
+        on death:
         - run dmodels_npc_despawn
 
 dmodels_npc_spawn:
