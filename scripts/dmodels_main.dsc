@@ -6,12 +6,12 @@
 # +---------------------------
 #
 # @author mcmonkey
-# @contributors Max^
+# @contributors Max^, conmom456
 # @thanks Darwin, Max^, kalebbroo, sharklaserss - for helping with reference models, testing, ideas, etc
 # @date 2022/06/01
-# @updated 2023/11/02
-# @denizen-build REL-1793
-# @script-version 2.3
+# @updated 2025/07/01
+# @denizen-build DEV-7144
+# @script-version 2.4
 #
 # This takes BlockBench "BBModel" files, converts them to a client-ready resource pack and Denizen internal data,
 # then is able to display them in minecraft and even animate them, by spawning and moving item display entities with resource pack items.
